@@ -1,4 +1,5 @@
 import { parseHarnessManifest } from "../core/manifest";
+import { resolveHarnessApiBaseUrl } from "./apiBaseUrl";
 
 export const workoutLogManifest = parseHarnessManifest({
   id: "workout-log",
@@ -9,7 +10,7 @@ export const workoutLogManifest = parseHarnessManifest({
       id: "mock-user-1",
       nickname: "목 유저"
     },
-    apiBaseUrl: "http://localhost:4317"
+    apiBaseUrl: resolveHarnessApiBaseUrl()
   },
   database: {
     resetMode: "truncate",
