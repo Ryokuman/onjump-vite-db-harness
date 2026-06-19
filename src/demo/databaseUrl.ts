@@ -15,7 +15,7 @@ export function assertSafeHarnessDatabaseUrl(databaseUrl: string): void {
     throw new Error("Harness DATABASE_URL must use postgres or postgresql.");
   }
 
-  const connectionTargetOverrides = ["host", "port"];
+  const connectionTargetOverrides = ["host", "port", "database"];
   const override = connectionTargetOverrides.find((name) => parsed.searchParams.has(name));
   if (override) {
     throw new Error(`Harness DATABASE_URL must not include a ${override} query override.`);

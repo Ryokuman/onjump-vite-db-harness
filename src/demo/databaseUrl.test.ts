@@ -39,6 +39,12 @@ describe("assertSafeHarnessDatabaseUrl", () => {
       assertSafeHarnessDatabaseUrl("postgres://onjump:onjump@localhost:55432/onjump_harness?port=5432")
     ).toThrow(/port query override/i);
   });
+
+  it("rejects database query overrides before pg can connect to another database", () => {
+    expect(() =>
+      assertSafeHarnessDatabaseUrl("postgres://onjump:onjump@localhost:55432/onjump_harness?database=postgres")
+    ).toThrow(/database query override/i);
+  });
 });
 
 describe("resolveHarnessDatabaseUrl", () => {
