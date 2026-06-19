@@ -15,8 +15,10 @@ export function assertSafeHarnessDatabaseUrl(databaseUrl: string): void {
     throw new Error("Harness DATABASE_URL must use postgres or postgresql.");
   }
 
-  if (parsed.searchParams.has("host")) {
-    throw new Error("Harness DATABASE_URL must not include a host query override.");
+  const connectionTargetOverrides = ["host", "port"];
+  const override = connectionTargetOverrides.find((name) => parsed.searchParams.has(name));
+  if (override) {
+    throw new Error(`Harness DATABASE_URL must not include a ${override} query override.`);
   }
 
   if (!SAFE_HOSTS.has(parsed.hostname)) {
