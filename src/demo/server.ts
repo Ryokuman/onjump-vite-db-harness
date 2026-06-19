@@ -4,10 +4,10 @@ import { PostgresDatabaseAdapter } from "../core/database";
 import { createHarnessController } from "../core/controller";
 import { getMockUser, workoutLogManifest, workoutLogSeedRows } from "./manifest";
 import { buildWorkoutLogInsert, normalizeWorkoutLogInput } from "./workoutLog";
+import { resolveHarnessDatabaseUrl } from "./databaseUrl";
 
 const port = Number(process.env.HARNESS_SERVER_PORT ?? 4317);
-const databaseUrl =
-  process.env.DATABASE_URL ?? "postgres://onjump:onjump@localhost:55432/onjump_harness";
+const databaseUrl = resolveHarnessDatabaseUrl();
 
 const pool = new Pool({ connectionString: databaseUrl });
 const adapter = new PostgresDatabaseAdapter(databaseUrl);
