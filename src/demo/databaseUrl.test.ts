@@ -8,6 +8,12 @@ describe("assertSafeHarnessDatabaseUrl", () => {
     ).not.toThrow();
   });
 
+  it("accepts the bracketed IPv6 loopback harness database", () => {
+    expect(() =>
+      assertSafeHarnessDatabaseUrl("postgres://onjump:onjump@[::1]:55432/onjump_harness")
+    ).not.toThrow();
+  });
+
   it("rejects non-local database hosts before reset can run", () => {
     expect(() =>
       assertSafeHarnessDatabaseUrl("postgres://user:password@prod-db.example.com:5432/onjump")

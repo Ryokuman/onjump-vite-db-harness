@@ -21,7 +21,8 @@ export function assertSafeHarnessDatabaseUrl(databaseUrl: string): void {
     throw new Error(`Harness DATABASE_URL must not include a ${override} query override.`);
   }
 
-  if (!SAFE_HOSTS.has(parsed.hostname)) {
+  const hostname = normalizeHostname(parsed.hostname);
+  if (!SAFE_HOSTS.has(hostname)) {
     throw new Error(
       `Unsafe database host "${parsed.hostname}". The harness only resets local or Docker database hosts.`
     );
@@ -33,4 +34,8 @@ export function assertSafeHarnessDatabaseUrl(databaseUrl: string): void {
       `Harness database name "${databaseName}" must include harness, test, local, or dev before reset can run.`
     );
   }
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/^\[(.*)\]$/, "$1");
 }
