@@ -13,45 +13,54 @@ export function App() {
   const [message, setMessage] = useState("");
 
   const latestRowId = useMemo(() => {
-    const row = snapshot?.tables.workout_logs.rows[0];
+    const row = snapshot?.tables.workout_logs?.rows[0];
     return typeof row?.id === "string" ? row.id : null;
   }, [snapshot]);
 
   async function refreshSnapshot() {
-    const response = await fetch(`${apiBaseUrl}/__harness/snapshot`);
-    setSnapshot(await response.json());
+    try {
+      setSnapshot(await requestJson<HarnessSnapshot>(`${apiBaseUrl}/__harness/snapshot`));
+    } catch {
+      setMessage("DB snapshot 로드 실패");
+    }
   }
 
   async function resetHarness() {
-    const response = await fetch(`${apiBaseUrl}/__harness/reset`, { method: "POST" });
-    setSnapshot(await response.json());
-    setMessage("DB baseline restored");
+    try {
+      setSnapshot(await requestJson<HarnessSnapshot>(`${apiBaseUrl}/__harness/reset`, { method: "POST" }));
+      setMessage("DB baseline restored");
+    } catch {
+      setMessage("DB 초기화 실패");
+    }
   }
 
   async function createWorkoutLog(event: FormEvent) {
     event.preventDefault();
-    const response = await fetch(`${apiBaseUrl}/api/workout-logs`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ exercise, minutes })
-    });
+    try {
+      await requestJson(`${apiBaseUrl}/api/workout-logs`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ exercise, minutes })
+      });
 
-    if (!response.ok) {
+      setMessage("운동 로그가 저장되었습니다");
+      await refreshSnapshot();
+    } catch {
       setMessage("저장 실패");
-      return;
     }
-
-    setMessage("운동 로그가 저장되었습니다");
-    await refreshSnapshot();
   }
 
   async function deleteLatestWorkoutLog() {
     if (!latestRowId) return;
-    await fetch(`${apiBaseUrl}/api/workout-logs/${encodeURIComponent(latestRowId)}`, {
-      method: "DELETE"
-    });
-    setMessage("최근 운동 로그가 삭제되었습니다");
-    await refreshSnapshot();
+    try {
+      await requestJson(`${apiBaseUrl}/api/workout-logs/${encodeURIComponent(latestRowId)}`, {
+        method: "DELETE"
+      });
+      setMessage("최근 운동 로그가 삭제되었습니다");
+      await refreshSnapshot();
+    } catch {
+      setMessage("최근 기록 삭제 실패");
+    }
   }
 
   useEffect(() => {
@@ -98,4 +107,15 @@ export function App() {
       />
     </main>
   );
+}
+
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
+  const body = await response.json();
+
+  if (!response.ok) {
+    throw new Error(typeof body?.error === "string" ? body.error : `Request failed with ${response.status}`);
+  }
+
+  return body as T;
 }

@@ -5,6 +5,7 @@ import { createHarnessController } from "../core/controller";
 import { getMockUser, workoutLogManifest, workoutLogSeedRows } from "./manifest";
 import { buildWorkoutLogInsert, normalizeWorkoutLogInput } from "./workoutLog";
 import { resolveHarnessDatabaseUrl } from "./databaseUrl";
+import { readJsonBody, RequestBodyError } from "./requestBody";
 import {
   assertTrustedMutationOrigin,
   getTrustedCorsOrigin,
@@ -71,7 +72,7 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "POST" && request.url === "/api/workout-logs") {
       assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
-      const body = await readJson(request);
+      const body = await readJsonBody(request);
       const input = normalizeWorkoutLogInput(body as { exercise: unknown; minutes: unknown });
       const insert = buildWorkoutLogInsert({
         userId: getMockUser().id,
@@ -99,6 +100,11 @@ const server = createServer(async (request, response) => {
     sendJson(response, 404, { error: "not found" });
   } catch (error) {
     if (error instanceof TrustedOriginError) {
+      sendJson(response, error.statusCode, { error: error.message });
+      return;
+    }
+
+    if (error instanceof RequestBodyError) {
       sendJson(response, error.statusCode, { error: error.message });
       return;
     }
@@ -142,14 +148,4 @@ function getOrigin(request: IncomingMessage): string | undefined {
 function sendJson(response: ServerResponse, status: number, body: unknown) {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(JSON.stringify(body));
-}
-
-async function readJson(request: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? JSON.parse(raw) : {};
 }
