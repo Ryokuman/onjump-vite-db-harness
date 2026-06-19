@@ -5,9 +5,16 @@ import { createHarnessController } from "../core/controller";
 import { getMockUser, workoutLogManifest, workoutLogSeedRows } from "./manifest";
 import { buildWorkoutLogInsert, normalizeWorkoutLogInput } from "./workoutLog";
 import { resolveHarnessDatabaseUrl } from "./databaseUrl";
+import {
+  assertTrustedMutationOrigin,
+  getTrustedCorsOrigin,
+  parseAllowedOrigins,
+  TrustedOriginError
+} from "./trustedOrigin";
 
 const port = Number(process.env.HARNESS_SERVER_PORT ?? 4317);
 const databaseUrl = resolveHarnessDatabaseUrl();
+const allowedOrigins = parseAllowedOrigins();
 
 const pool = new Pool({ connectionString: databaseUrl });
 const adapter = new PostgresDatabaseAdapter(databaseUrl);
@@ -32,9 +39,14 @@ async function bootstrap() {
 
 const server = createServer(async (request, response) => {
   try {
-    setCorsHeaders(response);
+    setCorsHeaders(request, response);
 
     if (request.method === "OPTIONS") {
+      if (!getTrustedCorsOrigin(getOrigin(request), allowedOrigins)) {
+        sendJson(response, 403, { error: "untrusted origin" });
+        return;
+      }
+
       response.writeHead(204);
       response.end();
       return;
@@ -51,12 +63,14 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "POST" && request.url === "/__harness/reset") {
+      assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
       await controller.resetAndSeed();
       sendJson(response, 200, await controller.snapshot());
       return;
     }
 
     if (request.method === "POST" && request.url === "/api/workout-logs") {
+      assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
       const body = await readJson(request);
       const input = normalizeWorkoutLogInput(body as { exercise: unknown; minutes: unknown });
       const insert = buildWorkoutLogInsert({
@@ -75,6 +89,7 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "DELETE" && request.url?.startsWith("/api/workout-logs/")) {
+      assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
       const id = decodeURIComponent(request.url.replace("/api/workout-logs/", ""));
       await pool.query("DELETE FROM workout_logs WHERE id = $1", [id]);
       sendJson(response, 200, await controller.snapshotTable("workout_logs"));
@@ -83,6 +98,11 @@ const server = createServer(async (request, response) => {
 
     sendJson(response, 404, { error: "not found" });
   } catch (error) {
+    if (error instanceof TrustedOriginError) {
+      sendJson(response, error.statusCode, { error: error.message });
+      return;
+    }
+
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "unknown error"
     });
@@ -104,10 +124,19 @@ async function shutdown() {
   process.exit(0);
 }
 
-function setCorsHeaders(response: ServerResponse) {
-  response.setHeader("Access-Control-Allow-Origin", "*");
+function setCorsHeaders(request: IncomingMessage, response: ServerResponse) {
+  const trustedOrigin = getTrustedCorsOrigin(getOrigin(request), allowedOrigins);
+  if (trustedOrigin) {
+    response.setHeader("Access-Control-Allow-Origin", trustedOrigin);
+  }
+  response.setHeader("Vary", "Origin");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "content-type");
+}
+
+function getOrigin(request: IncomingMessage): string | undefined {
+  const origin = request.headers.origin;
+  return Array.isArray(origin) ? origin[0] : origin;
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown) {
