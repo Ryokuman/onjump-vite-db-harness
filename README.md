@@ -42,6 +42,7 @@ npm run build
 - production DB URL을 사용하지 않습니다.
 - secret 값은 repo에 기록하지 않습니다.
 - `npm run dev:server`는 `DATABASE_URL` host가 `localhost`, `127.0.0.1`, `::1`, `db`, `host.docker.internal` 중 하나가 아니면 시작하지 않습니다.
+- `DATABASE_URL`의 `host` query override는 `pg` 연결 대상 우회를 막기 위해 허용하지 않습니다.
 - DB 이름에는 `harness`, `test`, `local`, `dev` 중 하나가 포함되어야 합니다.
 - mutating endpoint는 기본적으로 `http://localhost:5177`, `http://127.0.0.1:5177`, 또는 `HARNESS_ALLOWED_ORIGINS`에 등록된 Origin만 허용합니다.
 - DB inspector는 manifest에 allowlist된 table과 column만 보여줍니다.

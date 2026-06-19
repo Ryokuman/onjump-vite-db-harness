@@ -15,6 +15,10 @@ export function assertSafeHarnessDatabaseUrl(databaseUrl: string): void {
     throw new Error("Harness DATABASE_URL must use postgres or postgresql.");
   }
 
+  if (parsed.searchParams.has("host")) {
+    throw new Error("Harness DATABASE_URL must not include a host query override.");
+  }
+
   if (!SAFE_HOSTS.has(parsed.hostname)) {
     throw new Error(
       `Unsafe database host "${parsed.hostname}". The harness only resets local or Docker database hosts.`

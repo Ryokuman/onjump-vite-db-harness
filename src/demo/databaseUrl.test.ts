@@ -19,6 +19,14 @@ describe("assertSafeHarnessDatabaseUrl", () => {
       assertSafeHarnessDatabaseUrl("postgres://onjump:onjump@localhost:5432/onjump")
     ).toThrow(/must include/i);
   });
+
+  it("rejects host query overrides before pg can connect elsewhere", () => {
+    expect(() =>
+      assertSafeHarnessDatabaseUrl(
+        "postgres://onjump:onjump@localhost:55432/onjump_harness?host=prod-db.example.com"
+      )
+    ).toThrow(/host query override/i);
+  });
 });
 
 describe("resolveHarnessDatabaseUrl", () => {
