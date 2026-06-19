@@ -1,0 +1,35 @@
+{
+  "name": "onjump-vite-db-harness",
+  "version": "0.1.0",
+  "description": "Vite-based page harness for testing UI flows against resettable Docker databases.",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:server": "tsx src/demo/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "pg": "^8.16.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "vite": "^8.0.16",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "jsdom": "^27.3.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
