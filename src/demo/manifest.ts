@@ -17,7 +17,8 @@ export const workoutLogManifest = parseHarnessManifest({
       {
         name: "workout_logs",
         label: "운동 기록",
-        columns: ["id", "user_id", "exercise", "minutes", "created_at"]
+        columns: ["id", "user_id", "exercise", "minutes", "created_at"],
+        orderBy: { column: "created_at", direction: "desc" }
       }
     ]
   }

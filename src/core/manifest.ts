@@ -3,7 +3,13 @@ import { z } from "zod";
 const tableSchema = z.object({
   name: z.string().min(1),
   label: z.string().min(1),
-  columns: z.array(z.string().min(1)).min(1)
+  columns: z.array(z.string().min(1)).min(1),
+  orderBy: z
+    .object({
+      column: z.string().min(1),
+      direction: z.enum(["asc", "desc"]).default("desc")
+    })
+    .optional()
 });
 
 const manifestSchema = z.object({

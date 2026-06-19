@@ -61,10 +61,7 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
     const countResult = await this.pool.query<{ count: string }>(
       `SELECT COUNT(*) AS count FROM ${quoteIdentifier(table.name)}`
     );
-    const rowsResult = await this.pool.query<Record<string, unknown>>(
-      `SELECT ${table.columns.map(quoteIdentifier).join(", ")} FROM ${quoteIdentifier(table.name)} ORDER BY 1 DESC LIMIT $1`,
-      [limit]
-    );
+    const rowsResult = await this.pool.query<Record<string, unknown>>(buildSnapshotQuery(table), [limit]);
 
     return {
       table: table.name,
@@ -76,4 +73,19 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
   async close(): Promise<void> {
     await this.pool.end();
   }
+}
+
+export function buildSnapshotQuery(table: HarnessTable): string {
+  const orderBy = table.orderBy ?? { column: table.columns[0], direction: "desc" as const };
+
+  if (!table.columns.includes(orderBy.column)) {
+    throw new Error(`Snapshot order column "${orderBy.column}" must be included in table columns.`);
+  }
+
+  return [
+    `SELECT ${table.columns.map(quoteIdentifier).join(", ")}`,
+    `FROM ${quoteIdentifier(table.name)}`,
+    `ORDER BY ${quoteIdentifier(orderBy.column)} ${orderBy.direction.toUpperCase()}`,
+    "LIMIT $1"
+  ].join(" ");
 }
