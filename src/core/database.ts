@@ -17,7 +17,9 @@ export type DatabaseAdapter = {
 
 type SnapshotQueryResult = {
   __harness_row_count: string | number;
-  __harness_rows: Array<Record<string, unknown>>;
+  __harness_has_row: boolean | null;
+  __harness_order: number | null;
+  [column: string]: unknown;
 };
 
 function quoteIdentifier(identifier: string): string {
@@ -64,12 +66,15 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
 
   async snapshotTable(table: HarnessTable, limit = 20): Promise<TableSnapshot> {
     const snapshotResult = await this.pool.query<SnapshotQueryResult>(buildSnapshotQuery(table), [limit]);
-    const snapshot = snapshotResult.rows[0];
+    const rowCount = Number(snapshotResult.rows[0]?.__harness_row_count ?? 0);
+    const rows = snapshotResult.rows
+      .filter((row) => row.__harness_has_row)
+      .map(({ __harness_row_count, __harness_has_row, __harness_order, ...row }) => row);
 
     return {
       table: table.name,
-      rowCount: Number(snapshot?.__harness_row_count ?? 0),
-      rows: snapshot?.__harness_rows ?? []
+      rowCount,
+      rows
     };
   }
 
@@ -92,19 +97,15 @@ export function buildSnapshotQuery(table: HarnessTable): string {
     "WITH total_count AS (",
     `  SELECT COUNT(*) AS "__harness_row_count" FROM ${sourceTable}`,
     "), limited_rows AS (",
-    `  SELECT ${selectedColumns}, true AS "__harness_has_row"`,
+    `  SELECT ${selectedColumns}, true AS "__harness_has_row",`,
+    `    row_number() OVER (ORDER BY ${quoteIdentifier(orderBy.column)} ${orderBy.direction.toUpperCase()}) AS "__harness_order"`,
     `  FROM ${sourceTable}`,
     `  ORDER BY ${quoteIdentifier(orderBy.column)} ${orderBy.direction.toUpperCase()}`,
     "  LIMIT $1",
     ")",
-    "SELECT",
-    `  total_count."__harness_row_count",`,
-    "  COALESCE(",
-    '    jsonb_agg(to_jsonb(limited_rows) - \'__harness_has_row\') FILTER (WHERE limited_rows."__harness_has_row"),',
-    "    '[]'::jsonb",
-    '  ) AS "__harness_rows"',
+    `SELECT limited_rows.*, total_count."__harness_row_count"`,
     "FROM total_count",
     "LEFT JOIN limited_rows ON true",
-    'GROUP BY total_count."__harness_row_count"'
+    'ORDER BY "__harness_order" ASC'
   ].join(" ");
 }
