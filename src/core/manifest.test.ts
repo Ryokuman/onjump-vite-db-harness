@@ -40,4 +40,25 @@ describe("parseHarnessManifest", () => {
       })
     ).toThrow(/at least one table/i);
   });
+
+  it("rejects columns reserved for harness snapshot metadata", () => {
+    expect(() =>
+      parseHarnessManifest({
+        id: "unsafe",
+        title: "Unsafe",
+        route: "/unsafe",
+        dependencies: {},
+        database: {
+          resetMode: "truncate",
+          tables: [
+            {
+              name: "workout_logs",
+              label: "운동 기록",
+              columns: ["id", "__harness_row_count"]
+            }
+          ]
+        }
+      })
+    ).toThrow(/reserved harness metadata/i);
+  });
 });

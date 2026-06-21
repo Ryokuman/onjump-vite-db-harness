@@ -15,6 +15,13 @@ export type DatabaseAdapter = {
   snapshotTable(table: HarnessTable, limit?: number): Promise<TableSnapshot>;
 };
 
+type SnapshotQueryResult = {
+  __harness_row_count: string | number;
+  __harness_has_row: boolean | null;
+  __harness_order: number | null;
+  [column: string]: unknown;
+};
+
 function quoteIdentifier(identifier: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
     throw new Error(`Unsafe SQL identifier: ${identifier}`);
@@ -58,15 +65,16 @@ export class PostgresDatabaseAdapter implements DatabaseAdapter {
   }
 
   async snapshotTable(table: HarnessTable, limit = 20): Promise<TableSnapshot> {
-    const countResult = await this.pool.query<{ count: string }>(
-      `SELECT COUNT(*) AS count FROM ${quoteIdentifier(table.name)}`
-    );
-    const rowsResult = await this.pool.query<Record<string, unknown>>(buildSnapshotQuery(table), [limit]);
+    const snapshotResult = await this.pool.query<SnapshotQueryResult>(buildSnapshotQuery(table), [limit]);
+    const rowCount = Number(snapshotResult.rows[0]?.__harness_row_count ?? 0);
+    const rows = snapshotResult.rows
+      .filter((row) => row.__harness_has_row)
+      .map(({ __harness_row_count, __harness_has_row, __harness_order, ...row }) => row);
 
     return {
       table: table.name,
-      rowCount: Number(countResult.rows[0]?.count ?? 0),
-      rows: rowsResult.rows
+      rowCount,
+      rows
     };
   }
 
@@ -82,10 +90,22 @@ export function buildSnapshotQuery(table: HarnessTable): string {
     throw new Error(`Snapshot order column "${orderBy.column}" must be included in table columns.`);
   }
 
+  const selectedColumns = table.columns.map(quoteIdentifier).join(", ");
+  const sourceTable = quoteIdentifier(table.name);
+
   return [
-    `SELECT ${table.columns.map(quoteIdentifier).join(", ")}`,
-    `FROM ${quoteIdentifier(table.name)}`,
-    `ORDER BY ${quoteIdentifier(orderBy.column)} ${orderBy.direction.toUpperCase()}`,
-    "LIMIT $1"
+    "WITH total_count AS (",
+    `  SELECT COUNT(*) AS "__harness_row_count" FROM ${sourceTable}`,
+    "), limited_rows AS (",
+    `  SELECT ${selectedColumns}, true AS "__harness_has_row",`,
+    `    row_number() OVER (ORDER BY ${quoteIdentifier(orderBy.column)} ${orderBy.direction.toUpperCase()}) AS "__harness_order"`,
+    `  FROM ${sourceTable}`,
+    `  ORDER BY ${quoteIdentifier(orderBy.column)} ${orderBy.direction.toUpperCase()}`,
+    "  LIMIT $1",
+    ")",
+    `SELECT limited_rows.*, total_count."__harness_row_count"`,
+    "FROM total_count",
+    "LEFT JOIN limited_rows ON true",
+    'ORDER BY "__harness_order" ASC'
   ].join(" ");
 }

@@ -1,9 +1,21 @@
 import { z } from "zod";
 
+const RESERVED_SNAPSHOT_COLUMNS = new Set([
+  "__harness_row_count",
+  "__harness_has_row",
+  "__harness_order"
+]);
+
 const tableSchema = z.object({
   name: z.string().min(1),
   label: z.string().min(1),
-  columns: z.array(z.string().min(1)).min(1),
+  columns: z
+    .array(
+      z.string().min(1).refine((column) => !RESERVED_SNAPSHOT_COLUMNS.has(column), {
+        message: "Column name is reserved harness metadata"
+      })
+    )
+    .min(1),
   orderBy: z
     .object({
       column: z.string().min(1),

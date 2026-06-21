@@ -14,11 +14,25 @@ Vite로 특정 화면 또는 화면 일부를 띄우고, mock dependency와 Dock
 ```bash
 npm install
 docker compose up -d db
+cp .env.example .env
+```
+
+서버와 Vite는 각각 별도 터미널에서 실행합니다.
+
+```bash
 npm run dev:server
 npm run dev
 ```
 
 브라우저에서 `http://localhost:5177`을 엽니다.
+
+기본 포트는 아래와 같습니다.
+
+- Vite 화면: `http://localhost:5177`
+- Harness server: `http://localhost:4317`
+- Docker Postgres: `localhost:55432`
+
+`.env.example`의 기본값은 로컬 Docker DB와 Vite origin에 맞춰져 있습니다.
 
 ## 데모 흐름
 
