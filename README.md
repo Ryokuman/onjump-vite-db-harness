@@ -36,12 +36,14 @@ npm run dev
 
 ## 데모 흐름
 
-1. `운동 로그 기록` 화면이 Vite로 실행됩니다.
-2. mock user dependency가 주입됩니다.
-3. `DB Inspector`가 `workout_logs` table row count와 최근 row를 보여줍니다.
-4. `저장`을 누르면 backend API가 Docker Postgres에 row를 추가합니다.
-5. `최근 기록 삭제`를 누르면 row가 삭제됩니다.
-6. `DB 초기화`를 누르면 baseline seed로 돌아갑니다.
+1. `TASK-0036 식단 로그와 빠른 체크` 화면이 Vite로 실행됩니다.
+2. mock user dependency와 `task-0036-user` DB baseline이 주입됩니다.
+3. `DB Inspector`가 `users`, `auth_provider_identities`, `goals`, `daily_checks`, `food_logs` row를 보여줍니다.
+4. 제품 API를 `DATABASE_URL=postgres://onjump:onjump@localhost:55432/onjump_harness ENABLE_DEV_LOGIN=true ENABLE_MOCK_SOCIAL_LOGIN=true PORT=4000 npm --workspace @onjump/api run dev`로 실행합니다.
+5. `직접 입력 저장`을 누르면 제품 API가 Docker Postgres의 `food_logs`와 `daily_checks`를 갱신합니다.
+6. `빠른 체크`와 `미기록`은 제품 API의 `/today/food/status`를 호출합니다.
+7. `validation 실패 확인`은 `name=""`, `calories=-10` 입력이 저장되지 않는지 확인합니다.
+8. `DB 초기화`를 누르면 baseline seed로 돌아갑니다.
 
 ## 검증
 

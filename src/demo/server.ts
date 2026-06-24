@@ -2,10 +2,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { Pool } from "pg";
 import { PostgresDatabaseAdapter } from "../core/database";
 import { createHarnessController } from "../core/controller";
-import { getMockUser, workoutLogManifest, workoutLogSeedRows } from "./manifest";
-import { buildWorkoutLogInsert, normalizeWorkoutLogInput } from "./workoutLog";
+import { foodLogManifest, foodLogSeedRows } from "./manifest";
 import { resolveHarnessDatabaseUrl } from "./databaseUrl";
-import { readJsonBody, RequestBodyError } from "./requestBody";
+import { RequestBodyError } from "./requestBody";
 import {
   assertTrustedMutationOrigin,
   getTrustedCorsOrigin,
@@ -20,20 +19,74 @@ const allowedOrigins = parseAllowedOrigins();
 const pool = new Pool({ connectionString: databaseUrl });
 const adapter = new PostgresDatabaseAdapter(databaseUrl);
 const controller = createHarnessController({
-  manifest: workoutLogManifest,
+  manifest: foodLogManifest,
   adapter,
-  seedRows: workoutLogSeedRows
+  seedRows: foodLogSeedRows
 });
 
 async function bootstrap() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS auth_provider_identities (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      provider TEXT NOT NULL,
+      provider_user_id TEXT NOT NULL,
+      linked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (provider, provider_user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      goal_type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      current_weight_kg NUMERIC,
+      target_weight_kg NUMERIC,
+      target_date DATE,
+      tracking_strictness TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_checks (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      date DATE NOT NULL,
+      food_status TEXT NOT NULL DEFAULT 'unset',
+      workout_status TEXT NOT NULL DEFAULT 'unset',
+      weight_status TEXT NOT NULL DEFAULT 'unset',
+      completion_status TEXT NOT NULL DEFAULT 'incomplete',
+      analysis_quality TEXT NOT NULL DEFAULT 'normal',
+      PRIMARY KEY (user_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS food_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      date DATE NOT NULL,
+      name TEXT NOT NULL,
+      calories INTEGER NOT NULL,
+      meal_type TEXT NOT NULL,
+      meal_time TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS workout_logs (
-      id text PRIMARY KEY,
-      user_id text NOT NULL,
-      exercise text NOT NULL,
-      minutes integer NOT NULL,
-      created_at timestamptz NOT NULL
-    )
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      date DATE NOT NULL,
+      exercise_name TEXT NOT NULL,
+      exercise_type TEXT NOT NULL,
+      values JSONB NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS weight_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      date DATE NOT NULL,
+      weight_kg NUMERIC NOT NULL
+    );
   `);
   await controller.resetAndSeed();
 }
@@ -54,7 +107,7 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && request.url === "/__harness/manifest") {
-      sendJson(response, 200, workoutLogManifest);
+      sendJson(response, 200, foodLogManifest);
       return;
     }
 
@@ -67,33 +120,6 @@ const server = createServer(async (request, response) => {
       assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
       await controller.resetAndSeed();
       sendJson(response, 200, await controller.snapshot());
-      return;
-    }
-
-    if (request.method === "POST" && request.url === "/api/workout-logs") {
-      assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
-      const body = await readJsonBody(request);
-      const input = normalizeWorkoutLogInput(body as { exercise: unknown; minutes: unknown });
-      const insert = buildWorkoutLogInsert({
-        userId: getMockUser().id,
-        input
-      });
-
-      await pool.query(
-        `INSERT INTO workout_logs (id, user_id, exercise, minutes, created_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [insert.id, insert.user_id, insert.exercise, insert.minutes, insert.created_at]
-      );
-
-      sendJson(response, 201, insert);
-      return;
-    }
-
-    if (request.method === "DELETE" && request.url?.startsWith("/api/workout-logs/")) {
-      assertTrustedMutationOrigin(getOrigin(request), allowedOrigins);
-      const id = decodeURIComponent(request.url.replace("/api/workout-logs/", ""));
-      await pool.query("DELETE FROM workout_logs WHERE id = $1", [id]);
-      sendJson(response, 200, await controller.snapshotTable("workout_logs"));
       return;
     }
 
@@ -136,7 +162,7 @@ function setCorsHeaders(request: IncomingMessage, response: ServerResponse) {
     response.setHeader("Access-Control-Allow-Origin", trustedOrigin);
   }
   response.setHeader("Vary", "Origin");
-  response.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "content-type");
 }
 

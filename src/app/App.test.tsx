@@ -3,12 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 const snapshotResponse = {
-  manifestId: "workout-log",
+  manifestId: "task-0036-food-log",
   tables: {
-    workout_logs: {
-      table: "workout_logs",
+    daily_checks: {
+      table: "daily_checks",
       rowCount: 1,
-      rows: [{ id: "seed-log-1", exercise: "Push up", minutes: 10 }]
+      rows: [{ user_id: "task-0036-user", date: "2026-06-23", food_status: "unset" }]
+    },
+    food_logs: {
+      table: "food_logs",
+      rowCount: 0,
+      rows: []
     }
   }
 };
@@ -26,44 +31,46 @@ describe("App", () => {
 
     render(<App />);
 
-    await screen.findByText("Push up");
+    await screen.findByText("현재 food_status: unset");
     fireEvent.click(screen.getByRole("button", { name: "DB 초기화" }));
 
     expect(await screen.findByText("DB 초기화 실패")).toBeInTheDocument();
-    expect(screen.getByText("Push up")).toBeInTheDocument();
+    expect(screen.getByText("현재 food_status: unset")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("shows a delete failure when the backend rejects the mutation", async () => {
+  it("shows a quick check failure when the backend rejects the mutation", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse(snapshotResponse))
-      .mockResolvedValueOnce(jsonResponse({ error: "untrusted origin" }, { ok: false, status: 403 }));
+      .mockResolvedValueOnce(jsonResponse({ user: { id: "task-0036-user" }, token: "token" }))
+      .mockResolvedValueOnce(jsonResponse({ error: "not ready" }, { ok: false, status: 500 }));
 
     render(<App />);
 
-    await screen.findByText("Push up");
-    fireEvent.click(screen.getByRole("button", { name: "최근 기록 삭제" }));
+    await screen.findByText("현재 food_status: unset");
+    fireEvent.click(screen.getByRole("button", { name: "빠른 체크" }));
 
-    expect(await screen.findByText("최근 기록 삭제 실패")).toBeInTheDocument();
-    expect(screen.getByText("Push up")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText("식단 상태 저장 실패")).toBeInTheDocument();
+    expect(screen.getByText("현재 food_status: unset")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("shows a save failure when the workout log request cannot reach the backend", async () => {
+  it("shows a save failure when the food log request cannot reach the backend", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse(snapshotResponse))
+      .mockResolvedValueOnce(jsonResponse({ user: { id: "task-0036-user" }, token: "token" }))
       .mockRejectedValueOnce(new TypeError("network down"));
 
     render(<App />);
 
-    await screen.findByText("Push up");
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await screen.findByText("현재 food_status: unset");
+    fireEvent.click(screen.getByRole("button", { name: "직접 입력 저장" }));
 
     expect(await screen.findByText("저장 실패")).toBeInTheDocument();
-    expect(screen.getByText("Push up")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("현재 food_status: unset")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 

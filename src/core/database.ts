@@ -1,5 +1,7 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
 import type { HarnessTable } from "./manifest";
+
+types.setTypeParser(1082, (value) => value);
 
 export type SeedRows = Record<string, Array<Record<string, unknown>>>;
 
